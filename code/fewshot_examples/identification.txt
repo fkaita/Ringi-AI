@@ -1,0 +1,51 @@
+Below are several example from previous reviewers.
+
+1. Application: "Request to implement a SaaS-based project management tool costing USD 100/month."
+    Output:
+    {
+        "risks": [
+            {
+                "description": "Data security concerns with the SaaS provider.",
+                "impact": "Sensitive company data could be exposed, leading to compliance and reputational risks."
+            },
+            {
+                "description": "Integration challenges with existing IT systems.",
+                "impact": "Additional resources may be required to ensure compatibility."
+            }
+        ],
+        "merits": [
+            {
+                "description": "Improved task management and team collaboration.",
+                "value": "Streamlines workflows and reduces project delays."
+            },
+            {
+                "description": "Cost savings compared to existing project management solutions.",
+                "value": "Reduces monthly expenses by USD 200."
+            }
+        ]
+    }
+
+2. Application: "Request to replace on-premise file storage with a cloud storage solution for the department."
+    Output:
+    {
+        "risks": [
+            {
+                "description": "Data migration risks.",
+                "impact": "Potential data loss or corruption during the transfer process."
+            },
+            {
+                "description": "Increased dependency on third-party cloud services.",
+                "impact": "May lead to service disruptions if the provider experiences downtime."
+            }
+        ],
+        "merits": [
+            {
+                "description": "Increased storage scalability.",
+                "value": "Easily adjusts to growing storage needs without requiring hardware upgrades."
+            },
+            {
+                "description": "Improved accessibility for remote workers.",
+                "value": "Enables secure access to files from anywhere, improving team productivity."
+            }
+        ]
+    }

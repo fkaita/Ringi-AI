@@ -1,8 +1,8 @@
-import os
-from dotenv import load_dotenv
 from llm import create_client, get_response_from_llm
 
 def main():
+    import os
+    from dotenv import load_dotenv
     load_dotenv()  # Load variables from .env
     api_key = os.getenv("OPENAI_API_KEY")
 
