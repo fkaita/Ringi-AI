@@ -9,6 +9,8 @@ Author: SakanaAI
 import os
 import numpy as np
 import json
+from PyPDF2 import PdfReader
+import fitz
 from llm import (
     get_response_from_llm,
     get_batch_responses_from_llm,
@@ -122,9 +124,108 @@ If there is nothing to improve, simply repeat the previous JSON EXACTLY after th
 ONLY INCLUDE "I am done" IF YOU ARE MAKING NO MORE CHANGES."""
 
 
+import os
+
+def load_docs(path, num_pages=None, min_size=100):
+    """
+    Convert folder or file path to string content for input to LLM.
+    Handles application and appendix cases differently.
+    
+    Args:
+        path (str): The folder path containing files to be processed.
+        num_pages (int, optional): Maximum number of pages to process. Defaults to None (process all pages).
+        min_size (int, optional): Minimum size of text. Defaults to 100.
+
+    Returns:
+        str: Extracted text content.
+    """
+    try:
+        # Find application file starting with 'app_'
+        app_file = None
+        appendix_folder = None
+
+        for root, dirs, files in os.walk(path):
+            for file in files:
+                if file.startswith("app_") and file.endswith(".txt"):
+                    app_file = os.path.join(root, file)
+                    break
+
+            if "Appendix" in dirs:
+                appendix_folder = os.path.join(root, "Appendix")
+
+            if app_file and appendix_folder:
+                break
+
+        if not app_file:
+            raise FileNotFoundError("Application file starting with 'app_' not found.")
+
+        if not appendix_folder:
+            raise FileNotFoundError("Appendix folder not found.")
+
+        # Process application file
+        with open(app_file, "r") as f:
+            application_text = f.read()
+
+        # Process appendix folder
+        appendix_text = "APPENDIX TO THIS APPLICATION:\n"
+        for root, _, files in os.walk(appendix_folder):
+            for file in files:
+                if file.endswith(".pdf"):
+                    pdf_path = os.path.join(root, file)
+                    appendix_text += f"\n--- Start of {file} ---\n"
+                    appendix_text += extract_pdf_text(pdf_path, num_pages)
+                    appendix_text += f"\n--- End of {file} ---\n"
+
+        # Combine texts
+        combined_text = application_text + "\n" + appendix_text
+
+        if len(combined_text) < min_size:
+            raise Exception("Combined text too short")
+
+        return combined_text
+
+    except Exception as e:
+        print(f"Error: {e}")
+        return ""
 
 
+def extract_pdf_text(pdf_path, num_pages=None):
+    """
+    Extract text from a PDF file using PyMuPDF or PyPDF2.
 
+    Args:
+        pdf_path (str): Path to the PDF file.
+        num_pages (int, optional): Maximum number of pages to process. Defaults to None (process all pages).
+
+    Returns:
+        str: Extracted text from the PDF file.
+    """
+    try:
+        # Try using PyMuPDF
+        doc = fitz.open(pdf_path)
+        text = ""
+        for i, page in enumerate(doc):
+            if num_pages and i >= num_pages:
+                break
+            text += page.get_text()
+        doc.close()
+        return text
+    except Exception as e:
+        print(f"Error with PyMuPDF: {e}")
+
+    try:
+        # Fallback to PyPDF2
+        reader = PdfReader(pdf_path)
+        text = ""
+        for i, page in enumerate(reader.pages):
+            if num_pages and i >= num_pages:
+                break
+            text += page.extract_text()
+        return text
+    except Exception as e:
+        print(f"Error with PyPDF2: {e}")
+
+    return ""
 
 
 meta_reviewer_system_prompt = """You are an Area Chair at a machine learning conference.
