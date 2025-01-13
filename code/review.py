@@ -110,112 +110,38 @@ def perform_review(
 
     return review
 
-# def perform_review(
-#     text,
-#     model,
-#     client,
-#     num_reflections=1,
-#     num_fs_examples=0,
-#     num_reviews_ensemble=1,
-#     temperature=0.75,
-#     msg_history=None,
-#     return_msg_history=False,
-# ):
-#     if num_fs_examples > 0:
-#         fs_prompt = ""
-#         try:
-#             dir_path = os.path.dirname(os.path.realpath(__file__))
-#             file_path = os.path.join(dir_path, "fewshot_examples/identification.txt")
-#             with open(file_path, "r", encoding="utf-8") as file:
-#                 fs_prompt = file.read()
-#         except FileNotFoundError:
-#             print(f"The file at {file_path} does not exist.")
-#         except IOError as e:
-#             print(f"An error occurred while reading the file: {e}")
-
-#         base_prompt = review_prompt + fs_prompt
-#     else:
-#         base_prompt = review_prompt
-
-#     rc_prompt = "REVIEW CRITERIA OF IT DEPARTMENT:\n"
-
-#     dir_path = os.path.dirname(os.path.realpath(__file__))
-#     file_path = os.path.join(dir_path, "review_criteria/it_review_criteria")
-#     if not os.path.exists(file_path):
-#         print(f"The file at {file_path} does not exist.")
-#     else:
-#         try:
-#             with open(file_path, "r", encoding="utf-8") as file:
-#                 rc_prompt = file.read()
-#         except IOError as e:
-#             print(f"An error occurred while reading the file: {e}")
 
 
-#     base_prompt += rc_prompt
+feedback_prompt= """
+Please provide constructive advice comment to applicants.
+For example, how the applicant can enhance their strengths and mitigate the risks given these information.
+Please provide clear feedback less than 100 words.
+"""
 
-#     base_prompt += f"""
-#     Here is the application you are asked to review:
-#     ```
-#     {text}
-#     ```"""
-#     llm_review, msg_history = get_response_from_llm(
-#         base_prompt,
-#         model=model,
-#         client=client,
-#         system_message=it_reviewer_system_prompt,
-#         print_debug=False,
-#         msg_history=msg_history,
-#         temperature=temperature,
-#     )
-#     print(llm_review)
-#     review = json.loads(llm_review)
+def provide_feedback(
+    application_text,
+    review_text,
+    model,
+    client,
+    temperature=0.75,
+    msg_history=None,
+    return_msg_history=False,
+):
 
-#     if num_reflections > 1:
-#         for j in range(num_reflections - 1):
-#             # print(f"Relection: {j + 2}/{num_reflections}")
-#             text, msg_history = get_response_from_llm(
-#                 reviewer_reflection_prompt,
-#                 client=client,
-#                 model=model,
-#                 system_message=it_reviewer_system_prompt,
-#                 msg_history=msg_history,
-#                 temperature=temperature,
-#             )
-#             review = json.loads(text)
-#             assert review is not None, "Failed to extract JSON from LLM output"
+    base_prompt = feedback_prompt + "\nReview Result:\n" + review_text + "\nApplication Content:\n" + application_text
 
-#             if "I am done" in text:
-#                 # print(f"Review generation converged after {j + 2} iterations.")
-#                 break
+    llm_review, msg_history = get_response_from_llm(
+        base_prompt,
+        model=model,
+        client=client,
+        system_message=it_reviewer_system_prompt,
+        print_debug=False,
+        msg_history=msg_history,
+        temperature=temperature,
+    )
 
-#     if return_msg_history:
-#         return review, msg_history
-#     else:
-#         return review
+    return llm_review
 
-
-reviewer_reflection_prompt = """Round {current_round}/{num_reflections}.
-In your thoughts, first carefully consider the accuracy and soundness of the review you just created.
-Include any other factors that you think are important in evaluating the paper.
-Ensure the review is clear and concise, and the JSON is in the correct format.
-Do not make things overly complicated.
-In the next attempt, try and refine and improve your review.
-Stick to the spirit of the original review unless there are glaring issues.
-
-Respond in the same format as before:
-THOUGHT:
-<THOUGHT>
-
-REVIEW JSON:
-```json
-<JSON>
-```
-
-If there is nothing to improve, simply repeat the previous JSON EXACTLY after the thought and include "I am done" at the end of the thoughts but before the JSON.
-ONLY INCLUDE "I am done" IF YOU ARE MAKING NO MORE CHANGES."""
-
-
-import os
 
 def load_docs(path, num_pages=None, min_size=100):
     """
