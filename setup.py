@@ -11,7 +11,8 @@ setup(
         "anthropic",
         "python-dotenv",
         "pymupdf",
-        "PyPDF2"
+        "PyPDF2",
+        "pandas"
     ],
     description="AI-powered Japanese Ringi system",
     author="Kaita Furukawa",

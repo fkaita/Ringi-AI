@@ -9,6 +9,7 @@ Author: SakanaAI
 import os
 import numpy as np
 import json
+import re
 from PyPDF2 import PdfReader
 import fitz
 from llm import (
@@ -23,50 +24,67 @@ it_reviewer_system_prompt = (
     "Be critical and cautious in your decision-making process. Your evaluations should be structured, concise, and actionable."
 )
 
-identification_prompt = """
-Analyze the given application description to identify risks and clarify merits.
 
-Args:
-    application_description (str): A description of the application.
-    
+review_prompt= """
+Follow these steps to evaluate the application:
+Please carefully read through review criteria provided by the department
+For each criterion, determine if it is Pass or Reject based on the provided details.
+For each criterion, provide reason for the decision.
+Provide the results in a structured JSON format.
+
+Args: 
+    application_description (str): A description of the application with appendix documents
+
 Returns:
-    dict: A structured report containing identified risks and clarified merits.
+    dict: A structured report containing Pass or Reject decision of each criteria with reasons.
 
-Ensure that the risks and merits are clearly identified, described, and relevant to the application's context.
+    output format should be as below:
+    * Please remain original criteria ID and criteria name as key, "CriteriaID_CriteriaName" 
+    * Please only provide JSON output as string starting from { and ending with }
+
+    {
+        "CriteriaID_CriteriaName": {
+            "Decision": "Pass" or "Reject",
+            "Reason": "Clear explanation of the reason for the decision"
+        }
+        ...
+    }
+
 """
 
-def perform_identification(
+
+def perform_review(
     text,
     model,
     client,
-    num_reflections=1,
-    num_fs_examples=1,
-    num_reviews_ensemble=1,
     temperature=0.75,
     msg_history=None,
     return_msg_history=False,
 ):
-    if num_fs_examples > 0:
-        fs_prompt = ""
+
+    base_prompt = review_prompt
+
+    rc_prompt = "REVIEW CRITERIA OF IT DEPARTMENT:\n"
+
+    dir_path = os.path.dirname(os.path.realpath(__file__))
+    file_path = os.path.join(dir_path, "review_criteria/it_review_criteria")
+    if not os.path.exists(file_path):
+        print(f"The file at {file_path} does not exist.")
+    else:
         try:
-            dir_path = os.path.dirname(os.path.realpath(__file__))
-            file_path = os.path.join(dir_path, "fewshot_examples/identification.txt")
             with open(file_path, "r", encoding="utf-8") as file:
-                fs_prompt = file.read()
-        except FileNotFoundError:
-            print(f"The file at {file_path} does not exist.")
+                rc_prompt = file.read()
         except IOError as e:
             print(f"An error occurred while reading the file: {e}")
 
-        base_prompt = identification_prompt + fs_prompt
-    else:
-        base_prompt = identification_prompt
+    base_prompt += rc_prompt
 
     base_prompt += f"""
-Here is the application you are asked to review:
-```
-{text}
-```"""
+    Here is the application you are asked to review:
+    ```
+    {text}
+    ```"""
+
     llm_review, msg_history = get_response_from_llm(
         base_prompt,
         model=model,
@@ -76,31 +94,104 @@ Here is the application you are asked to review:
         msg_history=msg_history,
         temperature=temperature,
     )
-    print(llm_review)
-    review = json.loads(llm_review)
 
-    if num_reflections > 1:
-        for j in range(num_reflections - 1):
-            # print(f"Relection: {j + 2}/{num_reflections}")
-            text, msg_history = get_response_from_llm(
-                reviewer_reflection_prompt,
-                client=client,
-                model=model,
-                system_message=it_reviewer_system_prompt,
-                msg_history=msg_history,
-                temperature=temperature,
-            )
-            review = json.loads(text)
-            assert review is not None, "Failed to extract JSON from LLM output"
+    # Extract JSON from response
+    try:
+        json_match = re.search(r"{.*}", llm_review, re.DOTALL)
+        if json_match:
+            cleaned_review = json_match.group(0)
+            review = json.loads(cleaned_review)
+        else:
+            raise ValueError("No JSON found in response")
+    except json.JSONDecodeError as e:
+        print(f"JSON decoding failed: {e}")
+        print(f"LLM response: {llm_review}")
+        review = None
 
-            if "I am done" in text:
-                # print(f"Review generation converged after {j + 2} iterations.")
-                break
+    return review
 
-    if return_msg_history:
-        return review, msg_history
-    else:
-        return review
+# def perform_review(
+#     text,
+#     model,
+#     client,
+#     num_reflections=1,
+#     num_fs_examples=0,
+#     num_reviews_ensemble=1,
+#     temperature=0.75,
+#     msg_history=None,
+#     return_msg_history=False,
+# ):
+#     if num_fs_examples > 0:
+#         fs_prompt = ""
+#         try:
+#             dir_path = os.path.dirname(os.path.realpath(__file__))
+#             file_path = os.path.join(dir_path, "fewshot_examples/identification.txt")
+#             with open(file_path, "r", encoding="utf-8") as file:
+#                 fs_prompt = file.read()
+#         except FileNotFoundError:
+#             print(f"The file at {file_path} does not exist.")
+#         except IOError as e:
+#             print(f"An error occurred while reading the file: {e}")
+
+#         base_prompt = review_prompt + fs_prompt
+#     else:
+#         base_prompt = review_prompt
+
+#     rc_prompt = "REVIEW CRITERIA OF IT DEPARTMENT:\n"
+
+#     dir_path = os.path.dirname(os.path.realpath(__file__))
+#     file_path = os.path.join(dir_path, "review_criteria/it_review_criteria")
+#     if not os.path.exists(file_path):
+#         print(f"The file at {file_path} does not exist.")
+#     else:
+#         try:
+#             with open(file_path, "r", encoding="utf-8") as file:
+#                 rc_prompt = file.read()
+#         except IOError as e:
+#             print(f"An error occurred while reading the file: {e}")
+
+
+#     base_prompt += rc_prompt
+
+#     base_prompt += f"""
+#     Here is the application you are asked to review:
+#     ```
+#     {text}
+#     ```"""
+#     llm_review, msg_history = get_response_from_llm(
+#         base_prompt,
+#         model=model,
+#         client=client,
+#         system_message=it_reviewer_system_prompt,
+#         print_debug=False,
+#         msg_history=msg_history,
+#         temperature=temperature,
+#     )
+#     print(llm_review)
+#     review = json.loads(llm_review)
+
+#     if num_reflections > 1:
+#         for j in range(num_reflections - 1):
+#             # print(f"Relection: {j + 2}/{num_reflections}")
+#             text, msg_history = get_response_from_llm(
+#                 reviewer_reflection_prompt,
+#                 client=client,
+#                 model=model,
+#                 system_message=it_reviewer_system_prompt,
+#                 msg_history=msg_history,
+#                 temperature=temperature,
+#             )
+#             review = json.loads(text)
+#             assert review is not None, "Failed to extract JSON from LLM output"
+
+#             if "I am done" in text:
+#                 # print(f"Review generation converged after {j + 2} iterations.")
+#                 break
+
+#     if return_msg_history:
+#         return review, msg_history
+#     else:
+#         return review
 
 
 reviewer_reflection_prompt = """Round {current_round}/{num_reflections}.
