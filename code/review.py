@@ -115,7 +115,7 @@ def perform_review(
 feedback_prompt= """
 Please provide constructive advice comment to applicants.
 For example, how the applicant can enhance their strengths and mitigate the risks given these information.
-Please provide clear feedback less than 100 words.
+Please provide brief feedback in less than 100 words.
 """
 
 def provide_feedback(
@@ -243,35 +243,3 @@ def extract_pdf_text(pdf_path, num_pages=None):
         print(f"Error with PyPDF2: {e}")
 
     return ""
-
-
-meta_reviewer_system_prompt = """You are an Area Chair at a machine learning conference.
-You are in charge of meta-reviewing a paper that was reviewed by {reviewer_count} reviewers.
-Your job is to aggregate the reviews into a single meta-review in the same format.
-Be critical and cautious in your decision, find consensus, and respect the opinion of all the reviewers."""
-
-
-def get_meta_review(model, client, temperature, reviews):
-    # Write a meta-review from a set of individual reviews
-    review_text = ""
-    for i, r in enumerate(reviews):
-        review_text += f"""
-Review {i + 1}/{len(reviews)}:
-```
-{json.dumps(r)}
-```
-"""
-    base_prompt = neurips_form + review_text
-
-    llm_review, msg_history = get_response_from_llm(
-        base_prompt,
-        model=model,
-        client=client,
-        system_message=meta_reviewer_system_prompt.format(reviewer_count=len(reviews)),
-        print_debug=False,
-        msg_history=None,
-        temperature=temperature,
-    )
-    meta_review = extract_json_between_markers(llm_review)
-    return meta_review
-

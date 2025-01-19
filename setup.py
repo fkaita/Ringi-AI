@@ -12,7 +12,8 @@ setup(
         "python-dotenv",
         "pymupdf",
         "PyPDF2",
-        "pandas"
+        "pandas",
+        "tabulate"
     ],
     description="AI-powered Japanese Ringi system",
     author="Kaita Furukawa",
